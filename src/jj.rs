@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use std::process::Command;
+use tracing::debug;
 
 #[derive(Debug, Clone)]
 pub struct Change {
@@ -10,13 +11,22 @@ pub struct Change {
 
 /// Get all changes between base and target that are mine()
 pub fn get_changes(base: &str, target: &str) -> Result<Vec<Change>> {
+    let revisions_arg = format!("{base}..{target} & mine()");
+    let template_arg = "change_id ++ \"\\n\" ++ description.trim() ++ \"\\n\" ++ local_bookmarks.join(\",\") ++ \"\\n---\\n\"";
+
+    debug!(
+        command = "jj",
+        args = ?["log", "--no-graph", "--revisions", &revisions_arg, "--template", template_arg],
+        "Executing command"
+    );
+
     let output = Command::new("jj")
         .arg("log")
         .arg("--no-graph")
         .arg("--revisions")
-        .arg(format!("{base}..{target} & mine()"))
+        .arg(&revisions_arg)
         .arg("--template")
-        .arg("change_id ++ \"\\n\" ++ description.trim() ++ \"\\n\" ++ local_bookmarks.join(\",\") ++ \"\\n---\\n\"")
+        .arg(template_arg)
         .output()
         .context("Failed to execute jj log command")?;
 
@@ -69,6 +79,12 @@ fn parse_jj_log(output: &str) -> Result<Vec<Change>> {
 
 /// Create a bookmark for a given change
 pub fn create_bookmark(change_id: &str, bookmark_name: &str) -> Result<()> {
+    debug!(
+        command = "jj",
+        args = ?["bookmark", "create", bookmark_name, "--revision", change_id],
+        "Executing command"
+    );
+
     let output = Command::new("jj")
         .arg("bookmark")
         .arg("create")
@@ -88,6 +104,12 @@ pub fn create_bookmark(change_id: &str, bookmark_name: &str) -> Result<()> {
 
 /// Push a bookmark to the remote
 pub fn push_bookmark(bookmark_name: &str) -> Result<()> {
+    debug!(
+        command = "jj",
+        args = ?["git", "push", "--bookmark", bookmark_name, "--allow-new"],
+        "Executing command"
+    );
+
     let output = Command::new("jj")
         .arg("git")
         .arg("push")

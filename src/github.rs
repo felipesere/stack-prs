@@ -1,8 +1,15 @@
 use anyhow::{Context, Result};
 use std::process::Command;
+use tracing::debug;
 
 /// Create a pull request using the GitHub CLI (gh)
 pub fn create_pr(head_branch: &str, base_branch: &str, title: &str) -> Result<()> {
+    debug!(
+        command = "gh",
+        args = ?["pr", "create", "--head", head_branch, "--base", base_branch, "--title", title, "--body", ""],
+        "Executing command"
+    );
+
     let output = Command::new("gh")
         .arg("pr")
         .arg("create")

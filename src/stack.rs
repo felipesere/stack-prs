@@ -4,6 +4,7 @@ use std::fs;
 use std::io::Write;
 use std::process::Command;
 use tempfile::NamedTempFile;
+use tracing::debug;
 
 use crate::jj::Change;
 
@@ -63,6 +64,12 @@ pub fn edit_stack(changes: Vec<Change>) -> Result<Vec<StackEntry>> {
 
     // Get the editor from environment
     let editor = env::var("EDITOR").unwrap_or_else(|_| "vi".to_string());
+
+    debug!(
+        command = %editor,
+        args = ?[&temp_path.to_string_lossy().to_string()],
+        "Executing command"
+    );
 
     // Open the editor
     let status = Command::new(&editor)

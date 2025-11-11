@@ -1,9 +1,10 @@
+mod github;
 mod jj;
 mod stack;
-mod github;
 
 use anyhow::Result;
 use clap::Parser;
+use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
 #[derive(Parser, Debug)]
 #[command(name = "stack-prs")]
@@ -19,6 +20,15 @@ struct Args {
 }
 
 fn main() -> Result<()> {
+    // Initialize tracing with environment variable support
+    // Use RUST_LOG environment variable to control log level
+    // Example: RUST_LOG=debug stack-prs
+    // Default to 'info' level if not set
+    tracing_subscriber::registry()
+        .with(fmt::layer())
+        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
+        .init();
+
     let args = Args::parse();
 
     // Get all changes between base and target that are mine()
@@ -43,10 +53,14 @@ fn process_stack(entries: Vec<stack::StackEntry>) -> Result<()> {
                 continue;
             }
             stack::Action::CreateBookmark => {
-                let bookmark = entry.bookmark.as_ref()
-                    .ok_or_else(|| anyhow::anyhow!("Bookmark name required for action 'bookmark'"))?;
+                let bookmark = entry.bookmark.as_ref().ok_or_else(|| {
+                    anyhow::anyhow!("Bookmark name required for action 'bookmark'")
+                })?;
 
-                println!("Creating bookmark '{}' for change {}", bookmark, entry.change_id);
+                println!(
+                    "Creating bookmark '{}' for change {}",
+                    bookmark, entry.change_id
+                );
                 jj::create_bookmark(&entry.change_id, bookmark)?;
                 jj::push_bookmark(bookmark)?;
 
@@ -57,10 +71,13 @@ fn process_stack(entries: Vec<stack::StackEntry>) -> Result<()> {
                 previous_branch = Some(bookmark.clone());
             }
             stack::Action::CreatePr => {
-                let bookmark = entry.bookmark.as_ref()
+                let bookmark = entry
+                    .bookmark
+                    .as_ref()
                     .ok_or_else(|| anyhow::anyhow!("Bookmark name required for action 'pr'"))?;
 
                 let base_branch = previous_branch.as_deref().unwrap_or("main");
+                jj::push_bookmark(bookmark)?;
                 println!("Creating PR for existing bookmark '{bookmark}' against '{base_branch}'");
                 github::create_pr(bookmark, base_branch, &entry.description)?;
 
