@@ -1,10 +1,10 @@
 use anyhow::{Context, Result};
+use log::debug;
 use std::env;
 use std::fs;
 use std::io::Write;
 use std::process::Command;
 use tempfile::NamedTempFile;
-use tracing::debug;
 
 use crate::jj::Change;
 
@@ -66,9 +66,9 @@ pub fn edit_stack(changes: Vec<Change>) -> Result<Vec<StackEntry>> {
     let editor = env::var("EDITOR").unwrap_or_else(|_| "vi".to_string());
 
     debug!(
-        command = %editor,
-        args = ?[&temp_path.to_string_lossy().to_string()],
-        "Executing command"
+        "Executing command: {} {}",
+        editor,
+        temp_path.to_string_lossy()
     );
 
     // Open the editor

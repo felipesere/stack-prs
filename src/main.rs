@@ -3,33 +3,48 @@ mod jj;
 mod stack;
 
 use anyhow::Result;
-use clap::Parser;
-use tracing_subscriber::{fmt, prelude::*, EnvFilter};
+use bpaf::*;
+use owo_colors::OwoColorize;
 
-#[derive(Parser, Debug)]
-#[command(name = "stack-prs")]
-#[command(about = "Create stacked PRs on GitHub using jj", long_about = None)]
+#[derive(Debug, Clone)]
 struct Args {
-    /// Base revision (defaults to trunk())
-    #[arg(long, default_value = "trunk()")]
     base: String,
-
-    /// Target revision (defaults to @)
-    #[arg(long, default_value = "@")]
     target: String,
+    verbose: usize,
+}
+
+fn args() -> OptionParser<Args> {
+    let base = long("base")
+        .help("Base revision (defaults to trunk())")
+        .argument::<String>("REVISION")
+        .fallback(String::from("trunk()"));
+
+    let target = long("target")
+        .help("Target revision (defaults to @)")
+        .argument::<String>("REVISION")
+        .fallback(String::from("@"));
+
+    let verbose = short('v')
+        .long("verbose")
+        .help("Increase the verbosity\n You can specify it up to 3 times\n either as -v -v -v or as -vvv")
+        .req_flag(())
+        .many()
+        .map(|xs| xs.len())
+        .guard(|&x| x <= 3, "It doesn't get any more verbose than this");
+
+    construct!(Args {
+        base,
+        target,
+        verbose
+    })
+    .to_options()
+    .descr("Create stacked PRs on GitHub using jj")
 }
 
 fn main() -> Result<()> {
-    // Initialize tracing with environment variable support
-    // Use RUST_LOG environment variable to control log level
-    // Example: RUST_LOG=debug stack-prs
-    // Default to 'info' level if not set
-    tracing_subscriber::registry()
-        .with(fmt::layer())
-        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
-        .init();
+    let args = args().run();
 
-    let args = Args::parse();
+    setup_logging(args.verbose)?;
 
     // Get all changes between base and target that are mine()
     let changes = jj::get_changes(&args.base, &args.target)?;
@@ -39,6 +54,35 @@ fn main() -> Result<()> {
 
     // Process the stack entries
     process_stack(stack_entries)?;
+
+    Ok(())
+}
+
+fn setup_logging(verbosity: usize) -> Result<(), anyhow::Error> {
+    let mut base_config = fern::Dispatch::new().format(move |out, message, record| {
+        let level = match record.level() {
+            log::Level::Error => "ERROR".red().to_string(),
+            log::Level::Warn => "WARN".yellow().to_string(),
+            log::Level::Info => "INFO".blue().to_string(),
+            log::Level::Debug => "DEBUG".green().to_string(),
+            log::Level::Trace => "TRACE".magenta().to_string(),
+        };
+
+        let module = record.module_path().unwrap_or("unknown");
+
+        out.finish(format_args!("{level}:{module}: {message}",))
+    });
+
+    base_config = match verbosity {
+        0 => base_config.level(log::LevelFilter::Warn),
+        1 => base_config
+            .level(log::LevelFilter::Debug)
+            .level_for("rustls", log::LevelFilter::Warn),
+        2 => base_config.level(log::LevelFilter::Debug),
+        3 => base_config.level(log::LevelFilter::Trace),
+        _ => unreachable!("verbosity > 3"),
+    };
+    base_config.chain(std::io::stderr()).apply()?;
 
     Ok(())
 }
