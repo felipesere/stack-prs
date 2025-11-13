@@ -76,7 +76,7 @@ fn parse_jj_log(output: &str) -> Result<Vec<Change>> {
     Ok(changes)
 }
 
-/// Create a bookmark for a given change
+/// Create a bookmark for a specific change
 pub fn create_bookmark(change_id: &str, bookmark_name: &str) -> Result<()> {
     debug!(
         "Executing command: jj bookmark create {} --revision {}",
@@ -122,4 +122,38 @@ pub fn push_bookmark(bookmark_name: &str) -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Push a change and let jj create an automatic bookmark, returns the bookmark name
+pub fn push_change_auto_bookmark(change_id: &str) -> Result<String> {
+    debug!(
+        "Executing command: jj git push --change {}",
+        change_id
+    );
+
+    let output = Command::new("jj")
+        .arg("git")
+        .arg("push")
+        .arg("--change")
+        .arg(change_id)
+        .output()
+        .context("Failed to execute jj git push")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        anyhow::bail!("jj git push failed: {stderr}");
+    }
+
+    // Parse the output to extract the auto-generated bookmark name
+    // jj git push --change outputs something like "Creating bookmark push-xyzabc for revision ..."
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    for line in stdout.lines() {
+        if line.contains("Creating bookmark") {
+            if let Some(bookmark) = line.split_whitespace().nth(2) {
+                return Ok(bookmark.to_string());
+            }
+        }
+    }
+
+    anyhow::bail!("Failed to extract auto-generated bookmark name from jj git push output: {stdout}")
 }

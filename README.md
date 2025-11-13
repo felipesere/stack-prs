@@ -14,7 +14,9 @@ Stacked PRs allow you to work on multiple dependent changes simultaneously. Inst
 
 - 📝 **Interactive editing** - Review and organize your changes in your favorite editor
 - 🔗 **Automatic stacking** - Each PR automatically targets the previous PR's branch
-- 🎯 **Flexible actions** - Create new bookmarks, use existing ones, or skip changes
+- 🎯 **Flexible bookmarks** - Add custom bookmark names or let jj auto-generate them
+- 🔄 **Smart PR handling** - Detects existing PRs and keeps them in the stack
+- 💬 **Stack navigation comments** - Automatically adds comments to PRs with links to previous/next PRs in the stack
 
 ## Prerequisites
 
@@ -73,29 +75,36 @@ Your `$EDITOR` opens with a CSV-formatted file showing your changes:
 # The following file represents your stack in the order it will applied, top to bottom.
 # The first column can be one of:
 # * "skip" or "s": to skip this change entirely (can also just delete the line)
-# * "create-pr" or "pr": to create the PR based on an already existing bookmark
-# * "bookmark" or "b": to create a named bookmark to then use for the PR
+# * "pr": to create or update a PR for this change
+#         If a bookmark exists and has a PR, it will be kept in the stack
+#         If a bookmark exists without a PR, a PR will be created
+#         If no bookmark exists, jj will create an automatic one
 # the other columns are:
 # * the change ID
 # * the change description
-# * if present, the bookmark
+# * if present, the bookmark name (can be added/edited if not set)
 
-bookmark,pzkkouuwrxkrpoxqknztyqkpwtuqzqmz,Pass the architecture down to the Helm chart on render,enops-2222
-bookmark,utounnzrstvosknnorusyryvwywwqlwp,Detect arch with uname,enops-1111
+pr,pzkkouuwrxkrpoxqknztyqkpwtuqzqmz,Pass the architecture down to the Helm chart on render,enops-2222
+pr,utounnzrstvosknnorusyryvwywwqlwp,Detect arch with uname,enops-1111
 pr,rzpwqyytylqxowwlmywkpvpyqwlzuzyy,Create multi arch image,enops-1234
 s,nsqzmntuqwqulqnxnwnxkypqtqklstov,Use alpha releaser to release releaser,
-s,tvqnnqqmvtmsqsvwootxswqvrowwxnrs,Empty commit to re-trigger CI,arm-detection
+pr,tvqnnqqmvtmsqsvwootxswqvrowwxnrs,Empty commit to re-trigger CI,
 ```
 
 ### 3. Define Actions
 
 Edit the file to specify what to do with each change:
 
-| Action | Aliases | Description | Requires Bookmark |
+| Action | Aliases | Description | Bookmark Handling |
 |--------|---------|-------------|-------------------|
-| `bookmark` | `b` | Create a new bookmark and PR | ✅ Yes (4th column) |
-| `create-pr` | `pr` | Use existing bookmark to create PR | ✅ Yes (already exists) |
-| `skip` | `s` | Skip this change | ❌ No |
+| `pr` | - | Create or update a PR for this change | 📝 Optional: Add in 4th column or leave empty for auto-generation |
+| `skip` | `s` | Skip this change entirely | ❌ Not used |
+
+**Bookmark behavior:**
+- **Has bookmark + PR exists**: Keeps the existing PR in the stack
+- **Has bookmark + no PR**: Creates a PR for that bookmark
+- **User adds bookmark**: Creates the bookmark and PR
+- **No bookmark**: jj automatically generates a bookmark name
 
 ### 4. Automatic Stacking
 
@@ -111,9 +120,9 @@ When you save and close the editor, `stack-prs` processes your changes **top-to-
 Given this edited file:
 
 ```csv
-bookmark,abc123,Add user authentication,feature/auth
-bookmark,def456,Add user profile page,feature/profile
-bookmark,ghi789,Add profile settings,feature/settings
+pr,abc123,Add user authentication,feature/auth
+pr,def456,Add user profile page,feature/profile
+pr,ghi789,Add profile settings,
 s,jkl012,WIP: debugging,
 ```
 
@@ -127,22 +136,48 @@ s,jkl012,WIP: debugging,
    - Push to GitHub
    - Create PR: `feature/profile` → `feature/auth` (stacked!)
 
-3. ✅ Create bookmark `feature/settings` for change `ghi789`
+3. ✅ Auto-generate bookmark (e.g., `push-ghi789xyz`) for change `ghi789`
    - Push to GitHub
-   - Create PR: `feature/settings` → `feature/profile` (stacked!)
+   - Create PR: `push-ghi789xyz` → `feature/profile` (stacked!)
 
 4. ⏭️ Skip change `jkl012`
 
 The result is a chain of dependent PRs:
 ```
-main ← feature/auth ← feature/profile ← feature/settings
+main ← feature/auth ← feature/profile ← push-ghi789xyz
 ```
+
+## Stack Navigation
+
+After creating the PRs, `stack-prs` automatically adds a comment to each PR showing its position in the stack and linking to adjacent PRs:
+
+**Example comment on the middle PR:**
+
+```markdown
+## Stack Information
+
+This PR is **2 of 3** in the stack.
+
+⬇️ Previous PR: [Add user authentication](https://github.com/owner/repo/pull/122)
+
+⬆️ Next PR: [Add profile settings](https://github.com/owner/repo/pull/124)
+```
+
+**Key features:**
+- 🔢 Shows position in the stack (e.g., "2 of 3")
+- 🔗 Links to the previous PR (if not first)
+- 🔗 Links to the next PR (if not last)
+- 🔄 Updates automatically when you rerun the tool (no duplicate comments)
+
+This makes it easy for reviewers to understand the context and navigate through related PRs.
 
 ## Tips
 
 - **Review before running** - The interactive editor lets you review all changes before creating PRs
-- **Use descriptive branch names** - They become your PR titles and make the stack easy to navigate
+- **Add custom bookmark names** - Edit the 4th column to provide meaningful branch names, or leave empty for auto-generation
+- **Use descriptive branch names** - They make the stack easy to navigate in GitHub
 - **Reorder changes** - Edit the file to change the order of PRs in your stack
+- **Keep existing PRs** - If a bookmark already has a PR, it will be kept in the stack automatically
 
 ## Architecture
 

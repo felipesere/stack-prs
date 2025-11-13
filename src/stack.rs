@@ -11,9 +11,7 @@ use crate::jj::Change;
 #[derive(Debug, Clone)]
 pub enum Action {
     Skip,
-    CreateBookmark,
     CreatePr,
-    Keep,
 }
 
 #[derive(Debug, Clone)]
@@ -27,13 +25,14 @@ pub struct StackEntry {
 const HEADER: &str = r#"# The following file represents your stack in the order it will applied, top to bottom.
 # The first column can be one of:
 # * "skip" or "s": to skip this change entirely (can also just delete the line)
-# * "create-pr" or "pr": to create the PR based on an already existing bookmark
-# * "bookmark" or "b": to create a named bookmark to then use for the PR
-# * "keep" or "k": to keep existing PR in the stack without creating a new one (verifies PR exists)
+# * "pr": to create or update a PR for this change
+#         If a bookmark exists and has a PR, it will be kept in the stack
+#         If a bookmark exists without a PR, a PR will be created
+#         If no bookmark exists, jj will create an automatic one
 # the other columns are:
 # * the change ID
 # * the change description
-# * if present, the bookmark
+# * if present, the bookmark name (can be added/edited if not set)
 "#;
 
 /// Create a temporary file with the stack, open it in $EDITOR, and parse the result
@@ -42,12 +41,7 @@ pub fn edit_stack(changes: Vec<Change>) -> Result<Vec<StackEntry>> {
     let mut content = String::from(HEADER);
 
     for change in changes.iter().rev() {
-        let action = if change.bookmark.is_some() {
-            "pr"
-        } else {
-            "bookmark"
-        };
-
+        let action = "pr";
         let bookmark_str = change.bookmark.as_deref().unwrap_or("");
         content.push_str(&format!(
             "{},{},{},{}\n",
@@ -117,9 +111,7 @@ fn parse_stack_file(content: &str) -> Result<Vec<StackEntry>> {
 
         let action = match action_str {
             "skip" | "s" => Action::Skip,
-            "bookmark" | "b" => Action::CreateBookmark,
-            "create-pr" | "pr" => Action::CreatePr,
-            "keep" | "k" => Action::Keep,
+            "pr" => Action::CreatePr,
             _ => {
                 eprintln!("Warning: Unknown action '{action_str}', skipping line");
                 continue;
