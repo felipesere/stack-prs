@@ -127,6 +127,20 @@ fn process_stack(entries: Vec<stack::StackEntry>) -> Result<()> {
 
                 previous_branch = Some(bookmark.clone());
             }
+            stack::Action::Keep => {
+                let bookmark = entry
+                    .bookmark
+                    .as_ref()
+                    .ok_or_else(|| anyhow::anyhow!("Bookmark name required for action 'keep'"))?;
+
+                println!("Verifying PR exists for bookmark '{bookmark}'");
+                if !github::pr_exists(bookmark)? {
+                    anyhow::bail!("No PR found for bookmark '{bookmark}'. Cannot keep in stack without existing PR.");
+                }
+
+                println!("Keeping existing PR for '{bookmark}' in stack");
+                previous_branch = Some(bookmark.clone());
+            }
         }
     }
 

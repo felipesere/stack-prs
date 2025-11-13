@@ -13,6 +13,7 @@ pub enum Action {
     Skip,
     CreateBookmark,
     CreatePr,
+    Keep,
 }
 
 #[derive(Debug, Clone)]
@@ -28,6 +29,7 @@ const HEADER: &str = r#"# The following file represents your stack in the order 
 # * "skip" or "s": to skip this change entirely (can also just delete the line)
 # * "create-pr" or "pr": to create the PR based on an already existing bookmark
 # * "bookmark" or "b": to create a named bookmark to then use for the PR
+# * "keep" or "k": to keep existing PR in the stack without creating a new one (verifies PR exists)
 # the other columns are:
 # * the change ID
 # * the change description
@@ -117,6 +119,7 @@ fn parse_stack_file(content: &str) -> Result<Vec<StackEntry>> {
             "skip" | "s" => Action::Skip,
             "bookmark" | "b" => Action::CreateBookmark,
             "create-pr" | "pr" => Action::CreatePr,
+            "keep" | "k" => Action::Keep,
             _ => {
                 eprintln!("Warning: Unknown action '{action_str}', skipping line");
                 continue;
