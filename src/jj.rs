@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
-use std::process::Command;
 use log::debug;
+use std::process::Command;
 
 #[derive(Debug, Clone)]
 pub struct Change {
@@ -11,7 +11,7 @@ pub struct Change {
 
 /// Get all changes between base and target that are mine()
 pub fn get_changes(base: &str, target: &str) -> Result<Vec<Change>> {
-    let revisions_arg = format!("{base}..{target} & mine()");
+    let revisions_arg = format!("{base}::{target} & mine()");
     let template_arg = "change_id ++ \"\\n\" ++ description.trim() ++ \"\\n\" ++ local_bookmarks.join(\",\") ++ \"\\n---\\n\"";
 
     debug!(
@@ -126,10 +126,7 @@ pub fn push_bookmark(bookmark_name: &str) -> Result<()> {
 
 /// Push a change and let jj create an automatic bookmark, returns the bookmark name
 pub fn push_change_auto_bookmark(change_id: &str) -> Result<String> {
-    debug!(
-        "Executing command: jj git push --change {}",
-        change_id
-    );
+    debug!("Executing command: jj git push --change {}", change_id);
 
     let output = Command::new("jj")
         .arg("git")
@@ -155,5 +152,7 @@ pub fn push_change_auto_bookmark(change_id: &str) -> Result<String> {
         }
     }
 
-    anyhow::bail!("Failed to extract auto-generated bookmark name from jj git push output: {stdout}")
+    anyhow::bail!(
+        "Failed to extract auto-generated bookmark name from jj git push output: {stdout}"
+    )
 }
