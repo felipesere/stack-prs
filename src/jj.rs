@@ -9,21 +9,19 @@ pub struct Change {
     pub bookmark: Option<String>,
 }
 
-/// Get all changes between base and target that are mine()
-pub fn get_changes(base: &str, target: &str) -> Result<Vec<Change>> {
-    let revisions_arg = format!("{base}::{target} & mine()");
+/// Get all changes for given revisions
+pub fn get_changes(revisions: &str) -> Result<Vec<Change>> {
     let template_arg = "change_id ++ \"\\n\" ++ description.trim() ++ \"\\n\" ++ local_bookmarks.join(\",\") ++ \"\\n---\\n\"";
 
     debug!(
-        "Executing command: jj log --no-graph --revisions {} --template {}",
-        revisions_arg, template_arg
+        "Executing command: jj log --no-graph --revisions {revisions} --template {template_arg}",
     );
 
     let output = Command::new("jj")
         .arg("log")
         .arg("--no-graph")
         .arg("--revisions")
-        .arg(&revisions_arg)
+        .arg(revisions)
         .arg("--template")
         .arg(template_arg)
         .output()
